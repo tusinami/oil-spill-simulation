@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>海上溢油预测仿真系统</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- 顶部导航栏 -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5"/>
+            <path d="M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <h1>海上溢油预测仿真系统</h1>
+      </div>
+      <div class="header-right">
+        <span class="grid-status" id="gridStatus">检测数据中...</span>
+        <span class="status-badge" id="simStatus">就绪</span>
+        <span class="time-display" id="simTime">T + 0h 0m</span>
+      </div>
+    </header>
+
+    <!-- 主体内容 -->
+    <div class="main-content">
+      <!-- 左侧控制面板 -->
+      <aside class="control-panel">
+        <!-- 溢油参数 -->
+        <div class="panel-section">
+          <h3 class="section-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 8v4l3 3"/>
+            </svg>
+            溢油源参数
+          </h3>
+          <div class="form-group">
+            <label>预设场景</label>
+            <select id="scenarioSelect">
+              <option value="custom">自定义位置</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>溢油位置 (纬度)</label>
+            <input type="number" id="spillLat" value="38.5" step="0.1" min="-90" max="90">
+          </div>
+          <div class="form-group">
+            <label>溢油位置 (经度)</label>
+            <input type="number" id="spillLng" value="119.0" step="0.1" min="-180" max="180">
+          </div>
+          <div class="form-group">
+            <label>溢油量 (吨)</label>
+            <input type="number" id="oilVolume" value="500" min="1" max="100000">
+          </div>
+          <div class="form-group">
+            <label>油品类型</label>
+            <select id="oilType">
+              <option value="crude">原油</option>
+              <option value="fuel">燃料油</option>
+              <option value="diesel">柴油</option>
+              <option value="gasoline">汽油</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>溢油模式</label>
+            <select id="spillMode">
+              <option value="instant">瞬时溢油</option>
+              <option value="continuous">持续溢油</option>
+            </select>
+          </div>
+          <div class="form-group" id="spillDurationGroup" style="display:none">
+            <label>持续溢油时长 (小时)</label>
+            <input type="number" id="spillDuration" value="12" min="1" max="72">
+          </div>
+        </div>
+
+        <!-- 环境参数 -->
+        <div class="panel-section">
+          <h3 class="section-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/>
+            </svg>
+            环境参数
+          </h3>
+          <div class="form-group grid-data-toggle">
+            <label class="checkbox-label">
+              <input type="checkbox" id="useGridData" checked>
+              <span class="checkbox-text">使用真实海洋气象数据</span>
+            </label>
+            <div class="grid-data-hint">ERA5 风场 / CMEMS 海流 / 陆海掩膜</div>
+          </div>
+          <div class="form-group">
+            <label>风速 (m/s): <span id="windSpeedVal">5.0</span></label>
+            <input type="range" id="windSpeed" min="0" max="30" step="0.5" value="5">
+          </div>
+          <div class="form-group">
+            <label>风向 (度): <span id="windDirVal">180</span></label>
+            <input type="range" id="windDir" min="0" max="360" step="1" value="180">
+          </div>
+          <div class="form-group">
+            <label>海流速度 (m/s): <span id="currentSpeedVal">0.30</span></label>
+            <input type="range" id="currentSpeed" min="0" max="2" step="0.01" value="0.3">
+          </div>
+          <div class="form-group">
+            <label>海流方向 (度): <span id="currentDirVal">90</span></label>
+            <input type="range" id="currentDir" min="0" max="360" step="1" value="90">
+          </div>
+          <div class="form-group">
+            <label>水温 (°C): <span id="waterTempVal">18</span></label>
+            <input type="range" id="waterTemp" min="0" max="35" step="0.5" value="18">
+          </div>
+        </div>
+
+        <!-- 模拟控制 -->
+        <div class="panel-section">
+          <h3 class="section-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            模拟控制
+          </h3>
+          <div class="form-group">
+            <label>模拟时长 (小时)</label>
+            <input type="number" id="simDuration" value="48" min="1" max="168">
+          </div>
+          <div class="form-group">
+            <label>时间步长 (分钟)</label>
+            <select id="timeStep">
+              <option value="5">5 分钟</option>
+              <option value="10" selected>10 分钟</option>
+              <option value="30">30 分钟</option>
+              <option value="60">60 分钟</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>粒子数量</label>
+            <select id="particleCount">
+              <option value="500">500 (快速)</option>
+              <option value="1000" selected>1000 (标准)</option>
+              <option value="2000">2000 (精细)</option>
+              <option value="5000">5000 (高精度)</option>
+            </select>
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-primary" id="btnStart">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              开始模拟
+            </button>
+            <button class="btn btn-warning" id="btnPause" disabled>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+              暂停
+            </button>
+            <button class="btn btn-danger" id="btnReset">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+              重置
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 地图区域 -->
+      <div class="map-container">
+        <div id="map"></div>
+        <!-- 图例 -->
+        <div class="legend">
+          <h4>油膜厚度</h4>
+          <div class="legend-item"><span class="legend-color" style="background: rgba(30,30,30,0.9)"></span> > 1.0 mm (厚油膜)</div>
+          <div class="legend-item"><span class="legend-color" style="background: rgba(80,50,20,0.8)"></span> 0.1 - 1.0 mm</div>
+          <div class="legend-item"><span class="legend-color" style="background: rgba(139,90,43,0.7)"></span> 0.01 - 0.1 mm</div>
+          <div class="legend-item"><span class="legend-color" style="background: rgba(200,150,50,0.5)"></span> < 0.01 mm (虹彩)</div>
+          <div class="legend-item"><span class="legend-color" style="background: rgba(128,128,128,0.7)"></span> 搁浅 (触岸)</div>
+        </div>
+        <!-- 风向指示 -->
+        <div class="wind-indicator" id="windIndicator">
+          <div class="wind-arrow" id="windArrow"></div>
+          <div class="wind-info" id="windInfo">风速: 5.0 m/s</div>
+        </div>
+      </div>
+
+      <!-- 右侧信息面板 -->
+      <aside class="info-panel">
+        <!-- 实时统计 -->
+        <div class="panel-section">
+          <h3 class="section-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            实时统计
+          </h3>
+          <div class="stat-grid">
+            <div class="stat-card">
+              <div class="stat-value" id="statArea">0.00</div>
+              <div class="stat-label">扩散面积 (km²)</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="statRemaining">100.0</div>
+              <div class="stat-label">水面残留 (%)</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="statEvaporated">0.0</div>
+              <div class="stat-label">蒸发量 (%)</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="statDispersed">0.0</div>
+              <div class="stat-label">自然分散 (%)</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="statBeached">0</div>
+              <div class="stat-label">搁浅粒子数</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="statMaxDrift">0.00</div>
+              <div class="stat-label">最远漂移 (km)</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="statCenterLat">-</div>
+              <div class="stat-label">质心纬度</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="statCenterLng">-</div>
+              <div class="stat-label">质心经度</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 油品物性 -->
+        <div class="panel-section">
+          <h3 class="section-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+            </svg>
+            油品物性
+          </h3>
+          <div class="property-list" id="oilProperties">
+            <div class="property-item"><span>密度</span><span id="propDensity">860 kg/m³</span></div>
+            <div class="property-item"><span>粘度</span><span id="propViscosity">12 mPa·s</span></div>
+            <div class="property-item"><span>API度</span><span id="propAPI">33</span></div>
+            <div class="property-item"><span>蒸发系数</span><span id="propEvap">0.042</span></div>
+            <div class="property-item"><span>乳化含水率</span><span id="propEmulsion">0%</span></div>
+          </div>
+        </div>
+
+        <!-- 时间进度条 -->
+        <div class="panel-section">
+          <h3 class="section-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            模拟进度
+          </h3>
+          <div class="progress-container">
+            <div class="progress-bar">
+              <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-info">
+              <span id="progressTime">0h / 48h</span>
+              <span id="progressPercent">0%</span>
+            </div>
+          </div>
+          <div class="playback-controls">
+            <label>播放速度</label>
+            <div class="speed-btns">
+              <button class="speed-btn" data-speed="1">1x</button>
+              <button class="speed-btn active" data-speed="2">2x</button>
+              <button class="speed-btn" data-speed="5">5x</button>
+              <button class="speed-btn" data-speed="10">10x</button>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/simulation.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+# Raw NetCDF data (large files, re-downloadable)
+data/raw/*.nc
+data/raw/*.zip
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Node (unused)
+node_modules/
+
+# Logs
+*.log
+nohup.out
